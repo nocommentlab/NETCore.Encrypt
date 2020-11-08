@@ -86,6 +86,52 @@ namespace NETCore.Encrypt
             return Convert.ToBase64String(encryptBytes);
         }
 
+        /// <summary>  
+        /// AES encrypt
+        /// </summary>  
+        /// <param name="data">Raw data</param>  
+        /// <param name="key">Key, requires 32 bits</param>  
+        /// <param name="vector">IV,requires 16 bits</param>  
+        /// <returns>Encrypted string</returns>  
+        public static string AESEncrypt(string data, string key)
+        {
+            Check.Argument.IsNotEmpty(data, nameof(data));
+
+
+            /* Adapts the password lenght */
+            string paddedKey = (key.Length > 32) ? key.Substring(0, 32) : key.PadLeft(32, '*');
+
+            var vBYTE_paddedKey = Encoding.UTF8.GetBytes(paddedKey);
+
+            byte[] plainBytes = Encoding.UTF8.GetBytes(data);
+
+            var encryptBytes = AESEncrypt(plainBytes, vBYTE_paddedKey);
+            if (encryptBytes == null)
+            {
+                return null;
+            }
+            return Convert.ToBase64String(encryptBytes);
+        }
+
+        public static byte[] AESEncrypt(byte[] data, string key)
+        {
+            Check.Argument.IsNotEmpty(data, nameof(data));
+
+
+            /* Adapts the password lenght */
+            string paddedKey = (key.Length > 32) ? key.Substring(0, 32) : key.PadLeft(32, '*');
+
+            var vBYTE_paddedKey = Encoding.UTF8.GetBytes(paddedKey);
+
+
+            var encryptBytes = AESEncrypt(data, vBYTE_paddedKey);
+            if (encryptBytes == null)
+            {
+                return null;
+            }
+            return encryptBytes;
+        }
+
         /// <summary>
         /// AES encrypt
         /// </summary>
@@ -135,6 +181,55 @@ namespace NETCore.Encrypt
             }
         }
 
+        /// <summary>
+        /// AES encrypt
+        /// </summary>
+        /// <param name="data">Raw data</param>  
+        /// <param name="key">Key, requires 32 bits</param>  
+        /// <param name="vector">IV,requires 16 bits</param>  
+        /// <returns>Encrypted byte array</returns>  
+        public static byte[] AESEncrypt(byte[] data, byte[] key)
+        {
+            Check.Argument.IsNotEmpty(data, nameof(data));
+
+            Check.Argument.IsNotEmpty(key, nameof(key));
+            Check.Argument.IsNotOutOfRange(key.Length, 32, 32, nameof(key));
+
+
+            byte[] plainBytes = data;
+            byte[] bKey = new byte[32];
+            Array.Copy(key, bKey, bKey.Length);
+
+
+            byte[] encryptData = null; // encrypted data
+            using (Aes Aes = Aes.Create())
+            {
+                try
+                {
+                    using (MemoryStream Memory = new MemoryStream())
+                    {
+                        using (CryptoStream Encryptor = new CryptoStream(Memory,
+                         Aes.CreateEncryptor(bKey, Aes.IV),
+                         CryptoStreamMode.Write))
+                        {
+                            Encryptor.Write(plainBytes, 0, plainBytes.Length);
+                            Encryptor.FlushFinalBlock();
+
+                            encryptData = new byte[Aes.IV.Length + Memory.ToArray().Length];
+                            Array.Copy(Aes.IV, encryptData, Aes.IV.Length);
+                            Array.Copy(Memory.ToArray(), 0, encryptData, Aes.IV.Length, Memory.ToArray().Length);
+                            //encryptData = Memory.ToArray();
+                        }
+                    }
+                }
+                catch
+                {
+                    encryptData = null;
+                }
+                return encryptData;
+            }
+        }
+
         /// <summary>  
         ///  AES decrypt
         /// </summary>  
@@ -161,6 +256,48 @@ namespace NETCore.Encrypt
                 return null;
             }
             return Encoding.UTF8.GetString(decryptBytes);
+        }
+
+        public static string AESDecrypt(string data, string key)
+        {
+            Check.Argument.IsNotEmpty(data, nameof(data));
+
+
+            /* Adapts the password lenght */
+            string paddedKey = (key.Length > 32) ? key.Substring(0, 32) : key.PadLeft(32, '*');
+
+            var vBYTE_paddedKey = Encoding.UTF8.GetBytes(paddedKey);
+
+            byte[] encryptedBytes = Convert.FromBase64String(data);
+
+            byte[] decryptBytes = AESDecrypt(encryptedBytes, vBYTE_paddedKey);
+
+            if (decryptBytes == null)
+            {
+                return null;
+            }
+            return Encoding.UTF8.GetString(decryptBytes);
+        }
+
+        public static byte[] AESDecrypt(byte[] data, string key)
+        {
+            Check.Argument.IsNotEmpty(data, nameof(data));
+
+
+            /* Adapts the password lenght */
+            string paddedKey = (key.Length > 32) ? key.Substring(0, 32) : key.PadLeft(32, '*');
+
+            var vBYTE_paddedKey = Encoding.UTF8.GetBytes(paddedKey);
+
+            /*byte[] encryptedBytes = Convert.FromBase64String(data);*/
+
+            byte[] decryptBytes = AESDecrypt(data, vBYTE_paddedKey);
+
+            if (decryptBytes == null)
+            {
+                return null;
+            }
+            return decryptBytes;
         }
 
         /// <summary>  
@@ -219,6 +356,62 @@ namespace NETCore.Encrypt
                 return decryptedData;
             }
         }
+        /// <summary>  
+        ///  AES decrypt
+        /// </summary>  
+        /// <param name="data">Encrypted data</param>  
+        /// <param name="key">Key, requires 32 bits</param>  
+        /// <param name="vector">IV,requires 16 bits</param>  
+        /// <returns>Decrypted byte array</returns>  
+
+        public static byte[] AESDecrypt(byte[] data, byte[] key)
+        {
+            Check.Argument.IsNotEmpty(data, nameof(data));
+
+            Check.Argument.IsNotEmpty(key, nameof(key));
+            Check.Argument.IsNotOutOfRange(key.Length, 32, 32, nameof(key));
+
+
+            byte[] bKey = new byte[32];
+            byte[] bVector = new byte[16];
+            byte[] bExtractedEncryptedPayload = new byte[data.Length - bVector.Length];
+
+            Array.Copy(key, bKey, bKey.Length);
+            Array.Copy(data, bVector, bVector.Length);
+            Array.Copy(data, bVector.Length, bExtractedEncryptedPayload, 0, bExtractedEncryptedPayload.Length);
+
+            byte[] decryptedData = null;
+
+            using (Aes Aes = Aes.Create())
+            {
+                try
+                {
+                    using (MemoryStream Memory = new MemoryStream(bExtractedEncryptedPayload))
+                    {
+                        using (CryptoStream Decryptor = new CryptoStream(Memory, Aes.CreateDecryptor(bKey, bVector), CryptoStreamMode.Read))
+                        {
+                            using (MemoryStream tempMemory = new MemoryStream())
+                            {
+                                byte[] Buffer = new byte[1024];
+                                Int32 readBytes = 0;
+                                while ((readBytes = Decryptor.Read(Buffer, 0, Buffer.Length)) > 0)
+                                {
+                                    tempMemory.Write(Buffer, 0, readBytes);
+                                }
+
+                                decryptedData = tempMemory.ToArray();
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    decryptedData = null;
+                }
+
+                return decryptedData;
+            }
+        }
 
         /// <summary>  
         /// AES encrypt ( no IV)  
@@ -226,7 +419,7 @@ namespace NETCore.Encrypt
         /// <param name="data">Raw data</param>  
         /// <param name="key">Key, requires 32 bits</param>  
         /// <returns>Encrypted string</returns>  
-        public static string AESEncrypt(string data, string key)
+        /*public static string AESEncrypt(string data, string key)
         {
             Check.Argument.IsNotEmpty(data, nameof(data));
             Check.Argument.IsNotEmpty(key, nameof(key));
@@ -260,7 +453,7 @@ namespace NETCore.Encrypt
                     }
                 }
             }
-        }
+        }*/
 
         /// <summary>  
         /// AES decrypt( no IV)  
@@ -268,7 +461,7 @@ namespace NETCore.Encrypt
         /// <param name="data">Encrypted data</param>  
         /// <param name="key">Key, requires 32 bits</param>  
         /// <returns>Decrypted string</returns>  
-        public static string AESDecrypt(string data, string key)
+        /*public static string AESDecrypt(string data, string key)
         {
             Check.Argument.IsNotEmpty(data, nameof(data));
             Check.Argument.IsNotEmpty(key, nameof(key));
@@ -305,7 +498,7 @@ namespace NETCore.Encrypt
                     }
                 }
             }
-        }
+        }*/
 
 
         #endregion
